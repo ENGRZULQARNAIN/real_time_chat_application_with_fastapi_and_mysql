@@ -1,14 +1,15 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from .config import settings
 import os
-
-# MySQL Database URL configuration
-SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:your_password@localhost:3306/real_time_chat"
 
 # Create SQLAlchemy engine with MySQL-specific configuration
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL
+    settings.SQLALCHEMY_DATABASE_URL,
+    pool_pre_ping=True,  # Enable connection pool pre-ping
+    pool_size=5,  # Set connection pool size
+    max_overflow=10  # Maximum number of connections to overflow
 )
 
 # Create SessionLocal class for database sessions

@@ -25,6 +25,6 @@ app.add_middleware(
     )
 @app.get("/")
 async def root():
-    return {"message": "SALES FORCE v1.0.0"}
+    return {"message": "REAL TIME CHAT WANCLOUDS: v0.0.1"}
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
