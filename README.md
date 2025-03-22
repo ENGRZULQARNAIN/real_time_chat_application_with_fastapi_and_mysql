@@ -69,7 +69,7 @@ This is a real-time multi-user chat application built using Python FastAPI and M
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/ENGRZULQARNAIN/real_time_chat_application.git
+   git clone https://github.com/ENGRZULQARNAIN/real_time_chat_application_with_fastapi_and_mysql.git
    cd real_time_chat_application
    ```
 
