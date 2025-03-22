@@ -1,10 +1,7 @@
 import secrets
-import warnings
-from typing import Annotated, Any, Literal
+from typing import Any, Optional
 
-from pydantic_core import MultiHostUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing_extensions import Self
 
 
 def parse_cors(v: Any) -> list[str] | str:
@@ -22,12 +19,23 @@ class Settings(BaseSettings):
         extra="ignore",
     )
     API_V1_STR: str = "/api/v1"
-    SQLALCHEMY_DATABASE_URL: str = "mysql+mysqlconnector://root:your_password@localhost:3306/real_time_chat"
+    
+    # Database settings
+    MYSQL_SERVER: str
+    MYSQL_PORT: str
+    MYSQL_DB: str
+    MYSQL_USER: str
+    MYSQL_PASSWORD: str
+    
+    @property
+    def SQLALCHEMY_DATABASE_URL(self) -> str:
+        return (
+            f"mysql+mysqlconnector://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
+            f"@{self.MYSQL_SERVER}:{self.MYSQL_PORT}/{self.MYSQL_DB}"
+        )
+        
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
-    OPENAI_API_KEY: str
-    
 
 
-    
 settings = Settings()  # type: ignore
