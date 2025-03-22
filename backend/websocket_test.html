@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .chat-box {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+        }
+        .input-area {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 8px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .received {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196F3;
+        }
+        .sent {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4CAF50;
+            text-align: right;
+        }
+        .system {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+            font-style: italic;
+        }
+        .setup-area {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #f5f5f5;
+        }
+        .setup-area div {
+            margin-bottom: 10px;
+        }
+        .user-info {
+            font-size: 0.8em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket Chat Test</h1>
+        
+        <div class="setup-area">
+            <div>
+                <label for="serverUrl">Server URL:</label>
+                <input type="text" id="serverUrl" value="ws://localhost:8000/ws/" style="width: 300px;">
+            </div>
+            <div>
+                <label for="roomId">Room ID:</label>
+                <input type="text" id="roomId" value="1" style="width: 50px;">
+            </div>
+            <div>
+                <label for="token">Authentication Token:</label>
+                <input type="text" id="token" style="width: 300px;" placeholder="Paste your JWT token here">
+            </div>
+            <div>
+                <button id="connectBtn">Connect</button>
+                <button id="disconnectBtn" disabled>Disconnect</button>
+            </div>
+        </div>
+        
+        <div id="connectionStatus" class="system message">Not connected</div>
+        
+        <div id="chatBox" class="chat-box"></div>
+        
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Type a message..." disabled>
+            <button id="sendBtn" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let userId = null;
+        let userName = null;
+        
+        // DOM elements
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const messageInput = document.getElementById('messageInput');
+        const chatBox = document.getElementById('chatBox');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const serverUrlInput = document.getElementById('serverUrl');
+        const roomIdInput = document.getElementById('roomId');
+        const tokenInput = document.getElementById('token');
+        
+        // Connect to WebSocket
+        connectBtn.addEventListener('click', () => {
+            const serverUrl = serverUrlInput.value;
+            const roomId = roomIdInput.value;
+            const token = tokenInput.value;
+            
+            if (!token) {
+                addMessage('Please provide an authentication token', 'system');
+                return;
+            }
+            
+            try {
+                const fullUrl = `${serverUrl}${roomId}?token=${token}`;
+                ws = new WebSocket(fullUrl);
+                
+                addMessage(`Connecting to ${fullUrl}...`, 'system');
+                
+                // Connection opened
+                ws.addEventListener('open', (event) => {
+                    connectionStatus.textContent = 'Connected!';
+                    connectionStatus.style.backgroundColor = '#e8f5e9';
+                    
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    messageInput.disabled = false;
+                    sendBtn.disabled = false;
+                    
+                    addMessage('Connection established!', 'system');
+                });
+                
+                // Listen for messages
+                ws.addEventListener('message', (event) => {
+                    console.log('Message from server:', event.data);
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.error) {
+                        addMessage(`Error: ${data.error}`, 'system');
+                        disconnect();
+                        return;
+                    }
+                    
+                    // Handle different message types
+                    switch (data.type) {
+                        case 'user_joined':
+                            if (!userId) {
+                                // This is probably us joining
+                                userId = data.user_id;
+                                userName = data.user_name;
+                            }
+                            addMessage(`${data.user_name} joined the chat`, 'system');
+                            break;
+                            
+                        case 'user_left':
+                            addMessage(`${data.user_name} left the chat`, 'system');
+                            break;
+                            
+                        case 'message':
+                            const isMine = data.sender_id === userId;
+                            const messageClass = isMine ? 'sent' : 'received';
+                            const timestamp = new Date(data.created_at).toLocaleTimeString();
+                            
+                            addMessage(
+                                `${data.text}
+                                <div class="user-info">${data.sender_name} - ${timestamp}</div>`, 
+                                messageClass
+                            );
+                            break;
+                            
+                        default:
+                            addMessage(`Received: ${JSON.stringify(data)}`, 'system');
+                    }
+                });
+                
+                // Connection closed
+                ws.addEventListener('close', (event) => {
+                    addMessage(`Connection closed. Code: ${event.code}`, 'system');
+                    disconnect();
+                });
+                
+                // Connection error
+                ws.addEventListener('error', (error) => {
+                    addMessage('WebSocket error', 'system');
+                    console.error('WebSocket error:', error);
+                    disconnect();
+                });
+                
+            } catch (error) {
+                addMessage(`Error: ${error.message}`, 'system');
+                console.error('Error:', error);
+            }
+        });
+        
+        // Disconnect from WebSocket
+        disconnectBtn.addEventListener('click', () => {
+            disconnect();
+        });
+        
+        // Send message
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        function sendMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addMessage('Not connected to the server', 'system');
+                return;
+            }
+            
+            const text = messageInput.value.trim();
+            if (!text) return;
+            
+            const message = {
+                text: text
+            };
+            
+            ws.send(JSON.stringify(message));
+            messageInput.value = '';
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+            
+            connectionStatus.textContent = 'Disconnected';
+            connectionStatus.style.backgroundColor = '#ffebee';
+            
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            
+            userId = null;
+            userName = null;
+        }
+        
+        function addMessage(message, type) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type}`;
+            messageElement.innerHTML = message;
+            
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html> 
